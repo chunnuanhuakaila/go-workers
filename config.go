@@ -40,6 +40,12 @@ func Configure(options map[string]string) {
 		pollInterval = 15
 	}
 
+	useTLS := false
+	if p, err := strconv.ParseBool(options["use_tls"]); err == nil {
+		useTLS = p
+	}
+	dialOpts := []redis.DialOption{redis.DialUseTLS(useTLS)}
+
 	poolSize, _ = strconv.Atoi(options["pool"])
 
 	Config = &config{
@@ -50,7 +56,7 @@ func Configure(options map[string]string) {
 			MaxIdle:     poolSize,
 			IdleTimeout: 240 * time.Second,
 			Dial: func() (redis.Conn, error) {
-				c, err := redis.Dial("tcp", options["server"])
+				c, err := redis.Dial("tcp", options["server"], dialOpts...)
 				if err != nil {
 					return nil, err
 				}
