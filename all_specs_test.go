@@ -18,11 +18,11 @@ func TestAllSpecs(t *testing.T) {
 	r.Parallel = false
 
 	r.BeforeEach = func() {
-		Configure(map[string]string{
+		Configure(map[string]interface{}{
 			"server":   "127.0.0.1:6379",
 			"process":  "1",
-			"database": "15",
-			"pool":     "1",
+			"database": 15,
+			"pool":     1,
 		})
 
 		conn := Config.Pool.Get()
