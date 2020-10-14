@@ -26,7 +26,7 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 	Config.Namespace = "prod:"
 
 	c.Specify("puts messages in retry queue when they fail", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":true}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":25}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -71,7 +71,7 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 	})
 
 	c.Specify("allows numeric retries", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":5}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":5}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -86,7 +86,7 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 	})
 
 	c.Specify("handles new failed message", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":true}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":25}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -115,7 +115,7 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 	})
 
 	c.Specify("handles recurring failed message", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":true,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":10}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":25,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":10}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -142,7 +142,7 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 	})
 
 	c.Specify("handles recurring failed message with customized max", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":10,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":8}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":10,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":8}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -218,7 +218,7 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 	Config.Namespace = "prod:"
 
 	c.Specify("puts messages in retry queue when they fail", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":true}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":25}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -263,7 +263,7 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 	})
 
 	c.Specify("allows numeric retries", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":5}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":5}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -278,7 +278,7 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 	})
 
 	c.Specify("handles new failed message", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":true}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":25}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -307,7 +307,7 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 	})
 
 	c.Specify("handles recurring failed message", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":true,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":10}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":25,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":10}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
@@ -334,7 +334,7 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 	})
 
 	c.Specify("handles recurring failed message with customized max", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":10,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":8}")
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":10,\"queue\":\"default\",\"error_message\":\"bam\",\"failed_at\":\"2013-07-20 14:03:42 UTC\",\"retry_count\":8}")
 
 		wares.call("myqueue", message, func() error {
 			worker.process(message)
