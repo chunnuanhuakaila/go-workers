@@ -1,8 +1,10 @@
 package workers
 
 import (
-	"github.com/bitly/go-simplejson"
 	"reflect"
+
+	"github.com/bitly/go-simplejson"
+	"github.com/sirupsen/logrus"
 )
 
 type data struct {
@@ -12,6 +14,7 @@ type data struct {
 type Msg struct {
 	*data
 	original string
+	Logger   *logrus.Entry
 }
 
 type Args struct {
@@ -54,7 +57,9 @@ func NewMsg(content string) (*Msg, error) {
 	if d, err := newData(content); err != nil {
 		return nil, err
 	} else {
-		return &Msg{d, content}, nil
+		m := &Msg{data: d, original: content, Logger: nil}
+		m.Logger = Logger.WithField("Jid", m.Jid())
+		return m, nil
 	}
 }
 

@@ -61,8 +61,8 @@ func (w *worker) process(message *Msg) (acknowledge bool) {
 		recover()
 	}()
 
-	return w.manager.mids.call(w.manager.queueName(), message, func() {
-		w.manager.job(message)
+	return w.manager.mids.call(w.manager.queueName(), message, func() error {
+		return w.manager.job(message)
 	})
 }
 

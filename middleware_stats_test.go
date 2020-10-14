@@ -1,15 +1,17 @@
 package workers
 
 import (
+	"time"
+
 	"github.com/customerio/gospec"
 	. "github.com/customerio/gospec"
 	"github.com/garyburd/redigo/redis"
-	"time"
 )
 
 func MiddlewareStatsSpec(c gospec.Context) {
-	var job = (func(message *Msg) {
+	var job = (func(message *Msg) error {
 		// noop
+		return nil
 	})
 
 	layout := "2006-01-02"
@@ -40,7 +42,7 @@ func MiddlewareStatsSpec(c gospec.Context) {
 	})
 
 	c.Specify("failed job", func() {
-		var job = (func(message *Msg) {
+		var job = (func(message *Msg) error {
 			panic("AHHHH")
 		})
 

@@ -2,26 +2,30 @@ package workers
 
 import (
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 type MiddlewareStats struct{}
 
-func (l *MiddlewareStats) Call(queue string, message *Msg, next func() bool) (acknowledge bool) {
+func (l *MiddlewareStats) Call(queue string, message *Msg, next func() CallResult) (result CallResult) {
 	defer func() {
-		if e := recover(); e != nil {
-			incrementStats("failed")
-			panic(e)
+		if e := recover(); e != nil || result.Err != nil {
+			incrementStats(message.Logger, "failed")
+			if e != nil {
+				panic(e)
+			}
 		}
 	}()
 
-	acknowledge = next()
+	result = next()
 
-	incrementStats("processed")
+	incrementStats(message.Logger, "processed")
 
 	return
 }
 
-func incrementStats(metric string) {
+func incrementStats(logger *logrus.Entry, metric string) {
 	conn := Config.Pool.Get()
 	defer conn.Close()
 
@@ -32,6 +36,6 @@ func incrementStats(metric string) {
 	conn.Send("incr", Config.Namespace+"stat:"+metric+":"+today)
 
 	if _, err := conn.Do("exec"); err != nil {
-		Logger.Println("couldn't save stats:", err)
+		logger.Println("couldn't save stats:", err)
 	}
 }

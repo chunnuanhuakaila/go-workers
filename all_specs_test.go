@@ -19,7 +19,7 @@ func TestAllSpecs(t *testing.T) {
 
 	r.BeforeEach = func() {
 		Configure(map[string]string{
-			"server":   "localhost:6379",
+			"server":   "127.0.0.1:6379",
 			"process":  "1",
 			"database": "15",
 			"pool":     "1",
@@ -40,7 +40,8 @@ func TestAllSpecs(t *testing.T) {
 	r.AddSpec(ScheduledSpec)
 	r.AddSpec(EnqueueSpec)
 	r.AddSpec(MiddlewareSpec)
-	r.AddSpec(MiddlewareRetrySpec)
+	r.AddSpec(MiddlewareRetryWithPanicSpec)
+	r.AddSpec(MiddlewareRetryWithErrorSpec)
 	r.AddSpec(MiddlewareStatsSpec)
 
 	// Run GoSpec and report any errors to gotest's `testing.T` instance

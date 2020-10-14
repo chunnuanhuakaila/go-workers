@@ -3,10 +3,10 @@ package workers
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
-	"os"
 	"sync"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -14,7 +14,7 @@ const (
 	SCHEDULED_JOBS_KEY = "schedule"
 )
 
-var Logger WorkersLogger = log.New(os.Stdout, "workers: ", log.Ldate|log.Lmicroseconds)
+var Logger = logrus.WithField("from", "go-workers")
 
 var managers = make(map[string]*manager)
 var schedule *scheduled

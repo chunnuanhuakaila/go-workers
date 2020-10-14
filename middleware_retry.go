@@ -14,15 +14,20 @@ const (
 
 type MiddlewareRetry struct{}
 
-func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() bool) (acknowledge bool) {
+func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResult) (result CallResult) {
 	defer func() {
-		if e := recover(); e != nil {
+		if e := recover(); e != nil || result.Err != nil {
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
 			if retry(message) {
 				message.Set("queue", queue)
-				message.Set("error_message", fmt.Sprintf("%v", e))
+
+				if e != nil {
+					message.Set("error_message", fmt.Sprintf("%v", e))
+				} else {
+					message.Set("error_message", fmt.Sprintf("%v", result.Err))
+				}
 				retryCount := incrementRetry(message)
 
 				waitDuration := durationToSecondsWithNanoPrecision(
@@ -42,15 +47,17 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() bool) (ac
 				// then we shouldn't acknowledge the job, otherwise
 				// it'll disappear into the void.
 				if err != nil {
-					acknowledge = false
+					result.Acknowledge = false
 				}
 			}
 
-			panic(e)
+			if e != nil {
+				panic(e)
+			}
 		}
 	}()
 
-	acknowledge = next()
+	result = next()
 
 	return
 }

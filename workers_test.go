@@ -9,8 +9,9 @@ import (
 
 var called chan bool
 
-func myJob(message *Msg) {
+func myJob(message *Msg) error {
 	called <- true
+	return nil
 }
 
 func WorkersSpec(c gospec.Context) {

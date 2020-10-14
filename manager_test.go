@@ -1,7 +1,6 @@
 package workers
 
 import (
-	"fmt"
 	"sync"
 	"time"
 
@@ -16,7 +15,7 @@ type customMid struct {
 	mutex sync.Mutex
 }
 
-func (m *customMid) Call(queue string, message *Msg, next func() bool) (result bool) {
+func (m *customMid) Call(queue string, message *Msg, next func() CallResult) (result CallResult) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -39,8 +38,9 @@ func (m *customMid) Trace() []string {
 func ManagerSpec(c gospec.Context) {
 	processed := make(chan *Args)
 
-	testJob := (func(message *Msg) {
+	testJob := (func(message *Msg) error {
 		processed <- message.Args()
+		return nil
 	})
 
 	was := Config.Namespace
@@ -50,11 +50,6 @@ func ManagerSpec(c gospec.Context) {
 		c.Specify("sets queue with namespace", func() {
 			manager := newManager("myqueue", testJob, 10)
 			c.Expect(manager.queue, Equals, "prod:queue:myqueue")
-		})
-
-		c.Specify("sets job function", func() {
-			manager := newManager("myqueue", testJob, 10)
-			c.Expect(fmt.Sprint(manager.job), Equals, fmt.Sprint(testJob))
 		})
 
 		c.Specify("sets worker concurrency", func() {
@@ -105,7 +100,7 @@ func ManagerSpec(c gospec.Context) {
 
 			drained := false
 
-			slowJob := (func(message *Msg) {
+			slowJob := (func(message *Msg) error {
 				if message.ToJson() == sentinel.ToJson() {
 					drained = true
 				} else {
@@ -113,6 +108,7 @@ func ManagerSpec(c gospec.Context) {
 				}
 
 				time.Sleep(1 * time.Second)
+				return nil
 			})
 			manager := newManager("manager1", slowJob, 10)
 
