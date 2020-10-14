@@ -18,10 +18,10 @@ type EnqueueData struct {
 	Args       interface{} `json:"args"`
 	Jid        string      `json:"jid"`
 	EnqueuedAt float64     `json:"enqueued_at"`
-	EnqueueOptions
+	EnqueueParam
 }
 
-type EnqueueOptions struct {
+type EnqueueParam struct {
 	RetryCount int     `json:"retry_count,omitempty"`
 	At         float64 `json:"at,omitempty"`
 	MaxRetries int     `json:"max_retries,omitempty"`
@@ -37,27 +37,21 @@ func generateJid() string {
 	return fmt.Sprintf("%x", b)
 }
 
-func Enqueue(queue, class string, args interface{}) (string, error) {
-	return EnqueueWithOptions(queue, class, args, EnqueueOptions{At: nowToSecondsWithNanoPrecision()})
-}
+func Enqueue(queue, class string, args interface{}, opts ...EnqueueOptions) (string, error) {
+	var param EnqueueParam
+	defaultEnqueueOpt(&param)
+	for _, opt := range opts {
+		opt.Apply(&param)
+	}
 
-func EnqueueIn(queue, class string, in float64, args interface{}) (string, error) {
-	return EnqueueWithOptions(queue, class, args, EnqueueOptions{At: nowToSecondsWithNanoPrecision() + in})
-}
-
-func EnqueueAt(queue, class string, at time.Time, args interface{}) (string, error) {
-	return EnqueueWithOptions(queue, class, args, EnqueueOptions{At: timeToSecondsWithNanoPrecision(at)})
-}
-
-func EnqueueWithOptions(queue, class string, args interface{}, opts EnqueueOptions) (string, error) {
 	now := nowToSecondsWithNanoPrecision()
 	data := EnqueueData{
-		Queue:          queue,
-		Class:          class,
-		Args:           args,
-		Jid:            generateJid(),
-		EnqueuedAt:     now,
-		EnqueueOptions: opts,
+		Queue:        queue,
+		Class:        class,
+		Args:         args,
+		Jid:          generateJid(),
+		EnqueuedAt:   now,
+		EnqueueParam: param,
 	}
 
 	bytes, err := json.Marshal(data)
@@ -65,7 +59,7 @@ func EnqueueWithOptions(queue, class string, args interface{}, opts EnqueueOptio
 		return "", err
 	}
 
-	if now < opts.At {
+	if now < param.At {
 		err := enqueueAt(data.At, bytes)
 		return data.Jid, err
 	}

@@ -2,6 +2,7 @@ package workers
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/customerio/gospec"
 	. "github.com/customerio/gospec"
@@ -73,7 +74,7 @@ func EnqueueSpec(c gospec.Context) {
 		})
 
 		c.Specify("has max_retries and retry_count when set", func() {
-			EnqueueWithOptions("enqueue6", "Compare", []string{"foo", "bar"}, EnqueueOptions{RetryCount: 13, MaxRetries: 25})
+			Enqueue("enqueue6", "Compare", []string{"foo", "bar"}, WithMaxRetries(25))
 
 			bytes, _ := redis.Bytes(conn.Do("lpop", "prod:queue:enqueue6"))
 			var result map[string]interface{}
@@ -83,8 +84,7 @@ func EnqueueSpec(c gospec.Context) {
 			max := result["max_retries"].(float64)
 			c.Expect(max, Equals, float64(25))
 
-			retryCount := int(result["retry_count"].(float64))
-			c.Expect(retryCount, Equals, 13)
+			c.Expect(result["retry_count"], Equals, nil)
 		})
 	})
 
@@ -94,7 +94,7 @@ func EnqueueSpec(c gospec.Context) {
 		defer conn.Close()
 
 		c.Specify("has added a job in the scheduled queue", func() {
-			_, err := EnqueueIn("enqueuein1", "Compare", 10, map[string]interface{}{"foo": "bar"})
+			_, err := Enqueue("enqueuein1", "Compare", map[string]interface{}{"foo": "bar"}, WithIn(10*time.Millisecond))
 			c.Expect(err, Equals, nil)
 
 			scheduledCount, _ := redis.Int(conn.Do("zcard", scheduleQueue))
@@ -104,7 +104,7 @@ func EnqueueSpec(c gospec.Context) {
 		})
 
 		c.Specify("has the correct 'queue'", func() {
-			_, err := EnqueueIn("enqueuein2", "Compare", 10, map[string]interface{}{"foo": "bar"})
+			_, err := Enqueue("enqueuein2", "Compare", map[string]interface{}{"foo": "bar"}, WithIn(10*time.Millisecond))
 			c.Expect(err, Equals, nil)
 
 			var data EnqueueData
