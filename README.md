@@ -21,10 +21,11 @@ import (
 	"github.com/jrallison/go-workers"
 )
 
-func myJob(message *workers.Msg) {
+func myJob(message *workers.Msg) error {
   // do something with your message
   // message.Jid()
   // message.Args() is a wrapper around go-simplejson (http://godoc.org/github.com/bitly/go-simplejson)
+  return nil
 }
 
 type myMiddleware struct{}
@@ -37,13 +38,13 @@ func (r *myMiddleware) Call(queue string, message *workers.Msg, next func() bool
 } 
 
 func main() {
-  workers.Configure(map[string]string{
+  workers.Configure(map[string]interface{}{
     // location of redis instance
     "server":  "localhost:6379",
     // instance of the database
-    "database":  "0",
+    "database":  0,
     // number of connections to keep open with redis
-    "pool":    "30",
+    "pool":    30,
     // unique process id for this instance of workers (for proper recovery of inprogress jobs on crash)
     "process": "1",
   })
@@ -60,7 +61,7 @@ func main() {
   workers.Enqueue("myqueue3", "Add", []int{1, 2})
 
   // Add a job to a queue with retry
-  workers.EnqueueWithOptions("myqueue3", "Add", []int{1, 2}, workers.EnqueueOptions{Retry: true})
+  workers.Enqueue("myqueue3", "Add", []int{1, 2}, workers.WithMaxRetries(25))
 
   // stats will be available at http://localhost:8080/stats
   go workers.StatsServer(8080)
