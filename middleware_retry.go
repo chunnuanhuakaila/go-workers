@@ -8,7 +8,9 @@ import (
 )
 
 const (
-	LAYOUT = "2006-01-02 15:04:05 MST"
+	LAYOUT        = "2006-01-02 15:04:05 MST"
+	maxRetriesKey = "max_retries"
+	retryCountKey = "retry_count"
 )
 
 type MiddlewareRetry struct{}
@@ -19,7 +21,7 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResul
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
-			if retry(message) {
+			if ShouldRetry(message) {
 				message.Set("queue", queue)
 
 				if e != nil {
@@ -47,6 +49,13 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResul
 				// it'll disappear into the void.
 				if err != nil {
 					result.Acknowledge = false
+					message.Logger.Errorf("add to retry queue failed, error: %v", err)
+				} else {
+					message.Logger.Infof(
+						"add to retry queue, retry count: %d, max retries: %d",
+						message.Get(retryCountKey).MustInt(),
+						message.Get(maxRetriesKey).MustInt(),
+					)
 				}
 			}
 
@@ -61,15 +70,15 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResul
 	return
 }
 
-func retry(message *Msg) bool {
+func ShouldRetry(message *Msg) bool {
 	retry := false
 	max := 0
-	if param, err := message.Get("max_retries").Int(); err == nil {
+	if param, err := message.Get(maxRetriesKey).Int(); err == nil {
 		max = param
 		retry = param > 0
 	}
 
-	count, _ := message.Get("retry_count").Int()
+	count, _ := message.Get(retryCountKey).Int()
 
 	return retry && count < max
 }
@@ -77,14 +86,14 @@ func retry(message *Msg) bool {
 func incrementRetry(message *Msg) (retryCount int) {
 	retryCount = 0
 
-	if count, err := message.Get("retry_count").Int(); err != nil {
+	if count, err := message.Get(retryCountKey).Int(); err != nil {
 		message.Set("failed_at", time.Now().UTC().Format(LAYOUT))
 	} else {
 		message.Set("retried_at", time.Now().UTC().Format(LAYOUT))
 		retryCount = count + 1
 	}
 
-	message.Set("retry_count", retryCount)
+	message.Set(retryCountKey, retryCount)
 
 	return
 }

@@ -10,7 +10,7 @@ type MiddlewareLogging struct{}
 func (l *MiddlewareLogging) Call(queue string, message *Msg, next func() CallResult) (result CallResult) {
 	start := time.Now()
 	message.Logger.Println("start")
-	message.Logger.Println("args:", message.Args().ToJson())
+	message.Logger.Printf("queue: %v. args:%v", queue, message.Args().ToJson())
 
 	defer func() {
 		if e := recover(); e != nil {
@@ -24,12 +24,11 @@ func (l *MiddlewareLogging) Call(queue string, message *Msg, next func() CallRes
 		} else if result.Err != nil {
 			message.Logger.Println("fail:", time.Since(start))
 			message.Logger.Printf("error: %+v", result.Err)
+		} else {
+			message.Logger.Println("done:", time.Since(start))
 		}
 	}()
 
 	result = next()
-
-	message.Logger.Println("done:", time.Since(start))
-
 	return
 }
