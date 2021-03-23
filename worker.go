@@ -28,10 +28,12 @@ func (w *worker) work(messages chan *Msg) {
 		case message := <-messages:
 			atomic.StoreInt64(&w.startedAt, time.Now().UTC().Unix())
 			w.currentMsg = message
+			stop := w.manager.fetch.HeartbeatJob(message)
 
 			if w.process(message) {
 				w.manager.confirm <- message
 			}
+			stop <- true
 
 			atomic.StoreInt64(&w.startedAt, 0)
 			w.currentMsg = nil

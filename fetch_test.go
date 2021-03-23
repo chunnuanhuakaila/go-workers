@@ -1,6 +1,8 @@
 package workers
 
 import (
+	"time"
+
 	"github.com/customerio/gospec"
 	. "github.com/customerio/gospec"
 	"github.com/garyburd/redigo/redis"
@@ -55,10 +57,10 @@ func FetchSpec(c gospec.Context) {
 			fetch.Ready() <- true
 			<-fetch.Messages()
 
-			len, _ := redis.Int(conn.Do("llen", "queue:fetchQueue3:1:inprogress"))
+			len, _ := redis.Int(conn.Do("zcard", Config.Namespace+INPROGRESS_JOBS_KEY))
 			c.Expect(len, Equals, 1)
 
-			messages, _ := redis.Strings(conn.Do("lrange", "queue:fetchQueue3:1:inprogress", 0, -1))
+			messages, _ := redis.Strings(conn.Do("zrange", Config.Namespace+INPROGRESS_JOBS_KEY, 0, -1))
 			c.Expect(messages[0], Equals, message.ToJson())
 
 			fetch.Close()
@@ -114,25 +116,54 @@ func FetchSpec(c gospec.Context) {
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
-			conn.Do("lpush", "queue:fetchQueue6:1:inprogress", message.ToJson())
-			conn.Do("lpush", "queue:fetchQueue6:1:inprogress", message2.ToJson())
+			conn.Do("lpush", "queue:fetchQueue6", message.ToJson())
 			conn.Do("lpush", "queue:fetchQueue6", message3.ToJson())
+			conn.Do("lpush", "queue:fetchQueue6", message2.ToJson())
 
 			fetch := buildFetch("fetchQueue6")
 
 			fetch.Ready() <- true
-			c.Expect(<-fetch.Messages(), Equals, message2)
-			fetch.Ready() <- true
 			c.Expect(<-fetch.Messages(), Equals, message)
 			fetch.Ready() <- true
 			c.Expect(<-fetch.Messages(), Equals, message3)
+			fetch.Ready() <- true
+			c.Expect(<-fetch.Messages(), Equals, message2)
+
+			len, _ := redis.Int(conn.Do("zcard", Config.Namespace+INPROGRESS_JOBS_KEY))
+			c.Expect(len, Equals, 3)
 
 			fetch.Acknowledge(message)
-			fetch.Acknowledge(message2)
 			fetch.Acknowledge(message3)
+			fetch.Acknowledge(message2)
 
-			len, _ := redis.Int(conn.Do("llen", "queue:fetchQueue6:1:inprogress"))
+			len, _ = redis.Int(conn.Do("zcard", Config.Namespace+INPROGRESS_JOBS_KEY))
 			c.Expect(len, Equals, 0)
+
+			fetch.Close()
+		})
+
+		c.Specify("update message inprogress expired time", func() {
+			fetch := buildFetch("fetchQueue7")
+			message, _ := NewMsg("{\"foo\":\"bar\"}")
+
+			conn := Config.Pool.Get()
+			defer conn.Close()
+
+			now := timeToSecondsWithNanoPrecision(time.Now().Add(10 * time.Second))
+			conn.Do(
+				"zadd",
+				Config.Namespace+INPROGRESS_JOBS_KEY,
+				now,
+				message.OriginalJson(),
+			)
+
+			score, _ := redis.Float64(conn.Do("zscore", Config.Namespace+INPROGRESS_JOBS_KEY, message.OriginalJson()))
+			c.Expect(score, Equals, float64(now))
+
+			fetch.Heartbeat(message)
+
+			score, _ = redis.Float64(conn.Do("zscore", Config.Namespace+INPROGRESS_JOBS_KEY, message.OriginalJson()))
+			c.Expect(score, Not(Equals), float64(now))
 
 			fetch.Close()
 		})

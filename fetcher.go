@@ -16,16 +16,20 @@ type Fetcher interface {
 	Messages() chan *Msg
 	Close()
 	Closed() bool
+	HeartbeatJob(*Msg) chan bool
+	Heartbeat(*Msg)
 }
 
 type fetch struct {
-	queue        string
-	ready        chan bool
-	finishedwork chan bool
-	messages     chan *Msg
-	stop         chan bool
-	exit         chan bool
-	closed       chan bool
+	queue             string
+	ready             chan bool
+	finishedwork      chan bool
+	messages          chan *Msg
+	stop              chan bool
+	exit              chan bool
+	closed            chan bool
+	inprogressTimeout time.Duration
+	heartbeatInterval time.Duration
 }
 
 func NewFetch(queue string, messages chan *Msg, ready chan bool) Fetcher {
@@ -37,6 +41,8 @@ func NewFetch(queue string, messages chan *Msg, ready chan bool) Fetcher {
 		make(chan bool),
 		make(chan bool),
 		make(chan bool),
+		60 * time.Second,
+		50 * time.Second,
 	}
 }
 
@@ -45,17 +51,30 @@ func (f *fetch) Queue() string {
 }
 
 func (f *fetch) processOldMessages() {
-	messages := f.inprogressMessages()
+	conn := Config.Pool.Get()
+	defer conn.Close()
+
+	messages, err := redis.Strings(conn.Do("lrange", f.inprogressQueue(), 0, -1))
+	if err != nil {
+		Logger.Println("ERR: ", err)
+	}
 
 	for _, message := range messages {
-		<-f.Ready()
-		f.sendMessage(message)
+		_, err = conn.Do("lpush", f.queue, message)
+		if err != nil {
+			Logger.Println("ERR: ", err)
+			return
+		}
+	}
+
+	_, err = conn.Do("del", f.inprogressQueue())
+	if err != nil {
+		Logger.Println("ERR: ", err)
 	}
 }
 
 func (f *fetch) Fetch() {
 	f.processOldMessages()
-
 	go func() {
 		for {
 			// f.Close() has been called
@@ -79,18 +98,33 @@ func (f *fetch) Fetch() {
 	}
 }
 
+var popMessageScript = redis.NewScript(2, `
+	local val = redis.call('RPOP', KEYS[1])
+	if val ~= false then
+		redis.call('ZADD', KEYS[2], ARGV[1], val)
+	end
+	return val
+`)
+
 func (f *fetch) tryFetchMessage() {
 	conn := Config.Pool.Get()
 	defer conn.Close()
 
-	message, err := redis.String(conn.Do("brpoplpush", f.queue, f.inprogressQueue(), 1))
+	message, err := redis.String(
+		popMessageScript.Do(
+			conn,
+			f.queue,
+			Config.Namespace+INPROGRESS_JOBS_KEY,
+			timeToSecondsWithNanoPrecision(time.Now().Add(f.inprogressTimeout)),
+		),
+	)
 
 	if err != nil {
 		// If redis returns null, the queue is empty. Just ignore the error.
 		if err.Error() != "redigo: nil returned" {
 			Logger.Println("ERR: ", err)
-			time.Sleep(1 * time.Second)
 		}
+		time.Sleep(1 * time.Second)
 	} else {
 		f.sendMessage(message)
 	}
@@ -110,7 +144,7 @@ func (f *fetch) sendMessage(message string) {
 func (f *fetch) Acknowledge(message *Msg) {
 	conn := Config.Pool.Get()
 	defer conn.Close()
-	conn.Do("lrem", f.inprogressQueue(), -1, message.OriginalJson())
+	conn.Do("zrem", Config.Namespace+INPROGRESS_JOBS_KEY, message.OriginalJson())
 }
 
 func (f *fetch) Messages() chan *Msg {
@@ -139,18 +173,48 @@ func (f *fetch) Closed() bool {
 	}
 }
 
-func (f *fetch) inprogressMessages() []string {
-	conn := Config.Pool.Get()
-	defer conn.Close()
-
-	messages, err := redis.Strings(conn.Do("lrange", f.inprogressQueue(), 0, -1))
-	if err != nil {
-		Logger.Println("ERR: ", err)
-	}
-
-	return messages
-}
-
 func (f *fetch) inprogressQueue() string {
 	return fmt.Sprint(f.queue, ":", Config.processId, ":inprogress")
+}
+
+func (f *fetch) HeartbeatJob(msg *Msg) chan bool {
+	stop := make(chan bool)
+	timer := time.NewTimer(f.heartbeatInterval)
+	go func() {
+		defer timer.Stop()
+		for {
+			select {
+			case <-timer.C:
+				f.Heartbeat(msg)
+			case <-stop:
+				break
+			}
+		}
+	}()
+	return stop
+}
+
+var setIfExistsScript = redis.NewScript(1, `
+	local val = redis.call('ZSCORE', KEYS[1], ARGV[2])
+	if val ~= false then
+		redis.call('ZADD', KEYS[1], ARGV[1], ARGV[2])
+	end
+`)
+
+func (f *fetch) Heartbeat(msg *Msg) {
+	conn := Config.Pool.Get()
+	defer conn.Close()
+	_, err := setIfExistsScript.Do(
+		conn,
+		Config.Namespace+INPROGRESS_JOBS_KEY,
+		timeToSecondsWithNanoPrecision(time.Now().Add(f.inprogressTimeout)),
+		msg.OriginalJson(),
+	)
+	if err != nil {
+		msg.Logger.Warningln("ERR: ", err)
+	}
+}
+
+func (f *fetch) HeartbeatInterval() time.Duration {
+	return f.heartbeatInterval
 }

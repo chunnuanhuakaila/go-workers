@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	RETRY_KEY          = "goretry"
-	SCHEDULED_JOBS_KEY = "schedule"
+	RETRY_KEY           = "goretry"
+	SCHEDULED_JOBS_KEY  = "schedule"
+	INPROGRESS_JOBS_KEY = "inprogress"
 )
 
 var Logger = logrus.WithField("from", "go-workers")
@@ -97,7 +98,7 @@ func StatsServer(port int) {
 
 func startSchedule() {
 	if schedule == nil {
-		schedule = newScheduled(RETRY_KEY, SCHEDULED_JOBS_KEY)
+		schedule = newScheduled(RETRY_KEY, SCHEDULED_JOBS_KEY, INPROGRESS_JOBS_KEY)
 	}
 
 	schedule.start()
