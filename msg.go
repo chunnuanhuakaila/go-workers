@@ -15,6 +15,7 @@ type Msg struct {
 	*data
 	original string
 	Logger   *logrus.Entry
+	Context  map[string]interface{}
 }
 
 type Args struct {
@@ -57,7 +58,7 @@ func NewMsg(content string) (*Msg, error) {
 	if d, err := newData(content); err != nil {
 		return nil, err
 	} else {
-		m := &Msg{data: d, original: content, Logger: nil}
+		m := &Msg{data: d, original: content, Logger: nil, Context: map[string]interface{}{}}
 		m.Logger = Logger.WithField("Jid", m.Jid())
 		return m, nil
 	}
