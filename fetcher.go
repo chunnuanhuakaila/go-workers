@@ -179,15 +179,16 @@ func (f *fetch) inprogressQueue() string {
 
 func (f *fetch) HeartbeatJob(msg *Msg) chan bool {
 	stop := make(chan bool)
-	timer := time.NewTimer(f.heartbeatInterval)
+	ticker := time.NewTicker(f.heartbeatInterval)
 	go func() {
-		defer timer.Stop()
+		defer ticker.Stop()
+	hertbeatLoop:
 		for {
 			select {
-			case <-timer.C:
+			case <-ticker.C:
 				f.Heartbeat(msg)
 			case <-stop:
-				break
+				break hertbeatLoop
 			}
 		}
 	}()
