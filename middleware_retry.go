@@ -84,7 +84,7 @@ func ShouldRetry(message *Msg) bool {
 }
 
 func incrementRetry(message *Msg) (retryCount int) {
-	retryCount = 0
+	retryCount = 1
 
 	if count, err := message.Get(retryCountKey).Int(); err != nil {
 		message.Set("failed_at", time.Now().UTC().Format(LAYOUT))
