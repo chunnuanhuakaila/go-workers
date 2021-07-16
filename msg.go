@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"encoding/json"
 	"reflect"
 
 	"github.com/bitly/go-simplejson"
@@ -70,4 +71,12 @@ func newData(content string) (*data, error) {
 	} else {
 		return &data{json}, nil
 	}
+}
+
+func (s *Msg) Original2Obj(obj interface{}) error {
+	err := json.Unmarshal([]byte(s.original), obj)
+	if err != nil {
+		return err
+	}
+	return nil
 }
