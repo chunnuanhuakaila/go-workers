@@ -73,8 +73,14 @@ func newData(content string) (*data, error) {
 	}
 }
 
-func (s *Msg) Original2Obj(obj interface{}) error {
-	err := json.Unmarshal([]byte(s.original), obj)
+func (s *Msg) Args2Obj(obj interface{}) error {
+	args := s.Args()
+	data, err := args.MarshalJSON()
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(data, obj)
 	if err != nil {
 		return err
 	}
