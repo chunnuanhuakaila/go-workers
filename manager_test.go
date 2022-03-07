@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"strconv"
 	"sync"
 	"time"
 
@@ -81,13 +82,13 @@ func ManagerSpec(c gospec.Context) {
 		c.Specify("coordinates processing of queue messages", func() {
 			manager := newManager("manager1", testJob, 10)
 
-			conn.Do("lpush", "prod:queue:manager1", message.ToJson())
-			conn.Do("lpush", "prod:queue:manager1", message2.ToJson())
+			enqueueScript.Do(conn, "prod:queue:manager1", ARGV_VALUE_KEY, "jid", message.ToJson())
+			enqueueScript.Do(conn, "prod:queue:manager1", ARGV_VALUE_KEY, "jid2", message2.ToJson())
 
 			manager.start()
 
-			c.Expect(<-processed, Equals, message.Args())
-			c.Expect(<-processed, Equals, message2.Args())
+			c.Expect((<-processed).ToJson(), Equals, message.Args().ToJson())
+			c.Expect((<-processed).ToJson(), Equals, message2.Args().ToJson())
 
 			manager.quit()
 
@@ -113,9 +114,10 @@ func ManagerSpec(c gospec.Context) {
 			manager := newManager("manager1", slowJob, 10)
 
 			for i := 0; i < 9; i++ {
-				conn.Do("lpush", "prod:queue:manager1", message.ToJson())
+				jid := strconv.Itoa(i)
+				enqueueScript.Do(conn, "prod:queue:manager1", ARGV_VALUE_KEY, jid, message.ToJson())
 			}
-			conn.Do("lpush", "prod:queue:manager1", sentinel.ToJson())
+			enqueueScript.Do(conn, "prod:queue:manager1", ARGV_VALUE_KEY, "10", sentinel.ToJson())
 
 			manager.start()
 			for i := 0; i < 9; i++ {
@@ -141,9 +143,9 @@ func ManagerSpec(c gospec.Context) {
 			manager2 := newManager("manager2", testJob, 10, &mid2)
 			manager3 := newManager("manager3", testJob, 10, &mid3)
 
-			conn.Do("lpush", "prod:queue:manager1", message.ToJson())
-			conn.Do("lpush", "prod:queue:manager2", message.ToJson())
-			conn.Do("lpush", "prod:queue:manager3", message.ToJson())
+			enqueueScript.Do(conn, "prod:queue:manager1", ARGV_VALUE_KEY, "jid", message.ToJson())
+			enqueueScript.Do(conn, "prod:queue:manager2", ARGV_VALUE_KEY, "jid2", message.ToJson())
+			enqueueScript.Do(conn, "prod:queue:manager3", ARGV_VALUE_KEY, "jid3", message.ToJson())
 
 			manager1.start()
 			manager2.start()
@@ -179,8 +181,8 @@ func ManagerSpec(c gospec.Context) {
 
 			manager.prepare()
 
-			conn.Do("lpush", "prod:queue:manager2", message)
-			conn.Do("lpush", "prod:queue:manager2", message2)
+			enqueueScript.Do(conn, "prod:queue:manager2", ARGV_VALUE_KEY, "jid", message)
+			enqueueScript.Do(conn, "prod:queue:manager2", ARGV_VALUE_KEY, "jid2", message2)
 
 			manager.quit()
 

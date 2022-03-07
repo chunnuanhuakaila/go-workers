@@ -41,20 +41,17 @@ func (s *scheduled) poll() {
 	for _, key := range s.keys {
 		key = Config.Namespace + key
 		for {
-			messages, _ := redis.Strings(conn.Do("zrangebyscore", key, "-inf", now, "limit", 0, 1))
-
+			messages, _ := redis.Strings(scheduledScript.Do(conn, key, ARGV_VALUE_KEY, now))
 			if len(messages) == 0 {
 				break
 			}
 
-			message, _ := NewMsg(messages[0])
-
-			if removed, _ := redis.Bool(conn.Do("zrem", key, messages[0])); removed {
-				queue, _ := message.Get("queue").String()
-				queue = strings.TrimPrefix(queue, Config.Namespace)
-				message.Set("enqueued_at", nowToSecondsWithNanoPrecision())
-				conn.Do("lpush", Config.Namespace+"queue:"+queue, message.ToJson())
-			}
+			message, _ := NewMsg(messages[1])
+			queue, _ := message.Get("queue").String()
+			queue = strings.TrimPrefix(queue, Config.Namespace)
+			message.Set("enqueued_at", nowToSecondsWithNanoPrecision())
+			targetQueue := Config.Namespace + "queue:" + queue
+			redis.Bool(moveToL.Do(conn, key, targetQueue, ARGV_VALUE_KEY, messages[0], message.ToJson()))
 		}
 	}
 

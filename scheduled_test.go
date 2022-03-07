@@ -22,9 +22,9 @@ func ScheduledSpec(c gospec.Context) {
 		message2, _ := NewMsg("{\"queue\":\"myqueue\",\"foo\":\"bar2\"}")
 		message3, _ := NewMsg("{\"queue\":\"default\",\"foo\":\"bar3\"}")
 
-		conn.Do("zadd", "prod:"+RETRY_KEY, now-60.0, message1.ToJson())
-		conn.Do("zadd", "prod:"+RETRY_KEY, now-10.0, message2.ToJson())
-		conn.Do("zadd", "prod:"+RETRY_KEY, now+60.0, message3.ToJson())
+		enqueueAtScript.Do(conn, "prod:"+RETRY_KEY, ARGV_VALUE_KEY, "jid1", now-60.0, message1.ToJson())
+		enqueueAtScript.Do(conn, "prod:"+RETRY_KEY, ARGV_VALUE_KEY, "jid2", now-10.0, message2.ToJson())
+		enqueueAtScript.Do(conn, "prod:"+RETRY_KEY, ARGV_VALUE_KEY, "jid3", now+60.0, message3.ToJson())
 
 		scheduled.poll()
 

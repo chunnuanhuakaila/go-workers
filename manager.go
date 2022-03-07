@@ -5,6 +5,11 @@ import (
 	"sync"
 )
 
+type Acknowledge struct {
+	message  *Msg
+	KeepData bool
+}
+
 type manager struct {
 	queue       string
 	fetch       Fetcher
@@ -12,7 +17,7 @@ type manager struct {
 	concurrency int
 	workers     []*worker
 	workersM    *sync.Mutex
-	confirm     chan *Msg
+	confirm     chan *Acknowledge
 	stop        chan bool
 	exit        chan bool
 	mids        *Middlewares
@@ -110,7 +115,7 @@ func newManager(queue string, job jobFunc, concurrency int, mids ...Action) *man
 		concurrency,
 		make([]*worker, concurrency),
 		&sync.Mutex{},
-		make(chan *Msg),
+		make(chan *Acknowledge),
 		make(chan bool),
 		make(chan bool),
 		customMids,

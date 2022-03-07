@@ -10,7 +10,7 @@ import (
 type Fetcher interface {
 	Queue() string
 	Fetch()
-	Acknowledge(*Msg)
+	Acknowledge(*Acknowledge)
 	Ready() chan bool
 	FinishedWork() chan bool
 	Messages() chan *Msg
@@ -98,14 +98,6 @@ func (f *fetch) Fetch() {
 	}
 }
 
-var popMessageScript = redis.NewScript(2, `
-	local val = redis.call('RPOP', KEYS[1])
-	if val ~= false then
-		redis.call('ZADD', KEYS[2], ARGV[1], val)
-	end
-	return val
-`)
-
 func (f *fetch) tryFetchMessage() {
 	conn := Config.Pool.Get()
 	defer conn.Close()
@@ -115,13 +107,14 @@ func (f *fetch) tryFetchMessage() {
 			conn,
 			f.queue,
 			Config.Namespace+INPROGRESS_JOBS_KEY,
+			ARGV_VALUE_KEY,
 			timeToSecondsWithNanoPrecision(time.Now().Add(f.inprogressTimeout)),
 		),
 	)
 
 	if err != nil {
 		// If redis returns null, the queue is empty. Just ignore the error.
-		if err.Error() != "redigo: nil returned" {
+		if err != redis.ErrNil {
 			Logger.Println("ERR: ", err)
 		}
 		time.Sleep(1 * time.Second)
@@ -141,10 +134,14 @@ func (f *fetch) sendMessage(message string) {
 	f.Messages() <- msg
 }
 
-func (f *fetch) Acknowledge(message *Msg) {
+func (f *fetch) Acknowledge(ack *Acknowledge) {
 	conn := Config.Pool.Get()
 	defer conn.Close()
-	conn.Do("zrem", Config.Namespace+INPROGRESS_JOBS_KEY, message.OriginalJson())
+	if ack.KeepData {
+		remFromZ.Do(conn, Config.Namespace+INPROGRESS_JOBS_KEY, ARGV_VALUE_KEY, ack.message.Jid(), ack.message.ToJson())
+	} else {
+		remFromZ.Do(conn, Config.Namespace+INPROGRESS_JOBS_KEY, ARGV_VALUE_KEY, ack.message.Jid())
+	}
 }
 
 func (f *fetch) Messages() chan *Msg {

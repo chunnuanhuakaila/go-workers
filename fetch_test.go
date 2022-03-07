@@ -25,7 +25,7 @@ func FetchSpec(c gospec.Context) {
 	})
 
 	c.Specify("Fetch", func() {
-		message, _ := NewMsg("{\"foo\":\"bar\"}")
+		message, _ := NewMsg("{\"jid\":\"jid\",\"foo\":\"bar\"}")
 
 		c.Specify("it puts messages from the queues on the messages channel", func() {
 			fetch := buildFetch("fetchQueue2")
@@ -33,7 +33,7 @@ func FetchSpec(c gospec.Context) {
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
-			conn.Do("lpush", "queue:fetchQueue2", message.ToJson())
+			enqueueScript.Do(conn, "queue:fetchQueue2", ARGV_VALUE_KEY, "jid", message.ToJson())
 
 			fetch.Ready() <- true
 			message := <-fetch.Messages()
@@ -52,7 +52,7 @@ func FetchSpec(c gospec.Context) {
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
-			conn.Do("lpush", "queue:fetchQueue3", message.ToJson())
+			enqueueScript.Do(conn, "queue:fetchQueue3", ARGV_VALUE_KEY, "jid", message.ToJson())
 
 			fetch.Ready() <- true
 			<-fetch.Messages()
@@ -61,7 +61,7 @@ func FetchSpec(c gospec.Context) {
 			c.Expect(len, Equals, 1)
 
 			messages, _ := redis.Strings(conn.Do("zrange", Config.Namespace+INPROGRESS_JOBS_KEY, 0, -1))
-			c.Expect(messages[0], Equals, message.ToJson())
+			c.Expect(messages[0], Equals, "jid")
 
 			fetch.Close()
 		})
@@ -72,12 +72,12 @@ func FetchSpec(c gospec.Context) {
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
-			conn.Do("lpush", "queue:fetchQueue4", message.ToJson())
+			enqueueScript.Do(conn, "queue:fetchQueue4", ARGV_VALUE_KEY, "jid", message.ToJson())
 
 			fetch.Ready() <- true
 			<-fetch.Messages()
 
-			fetch.Acknowledge(message)
+			fetch.Acknowledge(&Acknowledge{message, false})
 
 			len, _ := redis.Int(conn.Do("llen", "queue:fetchQueue4:1:inprogress"))
 			c.Expect(len, Equals, 0)
@@ -96,12 +96,12 @@ func FetchSpec(c gospec.Context) {
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
-			conn.Do("lpush", "queue:fetchQueue5", json)
+			enqueueScript.Do(conn, "queue:fetchQueue5", ARGV_VALUE_KEY, "jid", json)
 
 			fetch.Ready() <- true
 			<-fetch.Messages()
 
-			fetch.Acknowledge(message)
+			fetch.Acknowledge(&Acknowledge{message, false})
 
 			len, _ := redis.Int(conn.Do("llen", "queue:fetchQueue5:1:inprogress"))
 			c.Expect(len, Equals, 0)
@@ -110,15 +110,15 @@ func FetchSpec(c gospec.Context) {
 		})
 
 		c.Specify("refires any messages left in progress from prior instance", func() {
-			message2, _ := NewMsg("{\"foo\":\"bar2\"}")
-			message3, _ := NewMsg("{\"foo\":\"bar3\"}")
+			message2, _ := NewMsg("{\"jid\":\"jid2\",\"foo\":\"bar2\"}")
+			message3, _ := NewMsg("{\"jid\":\"jid3\",\"foo\":\"bar3\"}")
 
 			conn := Config.Pool.Get()
 			defer conn.Close()
 
-			conn.Do("lpush", "queue:fetchQueue6", message.ToJson())
-			conn.Do("lpush", "queue:fetchQueue6", message3.ToJson())
-			conn.Do("lpush", "queue:fetchQueue6", message2.ToJson())
+			enqueueScript.Do(conn, "queue:fetchQueue6", ARGV_VALUE_KEY, "jid", message.ToJson())
+			enqueueScript.Do(conn, "queue:fetchQueue6", ARGV_VALUE_KEY, "jid2", message3.ToJson())
+			enqueueScript.Do(conn, "queue:fetchQueue6", ARGV_VALUE_KEY, "jid3", message2.ToJson())
 
 			fetch := buildFetch("fetchQueue6")
 
@@ -132,9 +132,9 @@ func FetchSpec(c gospec.Context) {
 			len, _ := redis.Int(conn.Do("zcard", Config.Namespace+INPROGRESS_JOBS_KEY))
 			c.Expect(len, Equals, 3)
 
-			fetch.Acknowledge(message)
-			fetch.Acknowledge(message3)
-			fetch.Acknowledge(message2)
+			fetch.Acknowledge(&Acknowledge{message, false})
+			fetch.Acknowledge(&Acknowledge{message3, false})
+			fetch.Acknowledge(&Acknowledge{message2, false})
 
 			len, _ = redis.Int(conn.Do("zcard", Config.Namespace+INPROGRESS_JOBS_KEY))
 			c.Expect(len, Equals, 0)

@@ -30,8 +30,9 @@ func (w *worker) work(messages chan *Msg) {
 			w.currentMsg = message
 			stop := w.manager.fetch.HeartbeatJob(message)
 
-			if w.process(message) {
-				w.manager.confirm <- message
+			result := w.process(message)
+			if result.Acknowledge {
+				w.manager.confirm <- &Acknowledge{message, result.KeepData}
 			}
 			stop <- true
 
@@ -56,8 +57,8 @@ func (w *worker) work(messages chan *Msg) {
 	}
 }
 
-func (w *worker) process(message *Msg) (acknowledge bool) {
-	acknowledge = true
+func (w *worker) process(message *Msg) (result CallResult) {
+	result = CallResult{true, false, nil}
 
 	defer func() {
 		recover()

@@ -30,7 +30,8 @@ func confirm(manager *manager) (msg *Msg) {
 	time.Sleep(10 * time.Millisecond)
 
 	select {
-	case msg = <-manager.confirm:
+	case ack := <-manager.confirm:
+		msg = ack.message
 	default:
 	}
 

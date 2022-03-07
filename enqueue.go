@@ -60,7 +60,7 @@ func Enqueue(queue, class string, args interface{}, opts ...EnqueueOptions) (str
 	}
 
 	if now < param.At {
-		err := enqueueAt(data.At, bytes)
+		err := enqueueAt(data.Jid, data.At, bytes)
 		return data.Jid, err
 	}
 
@@ -72,7 +72,7 @@ func Enqueue(queue, class string, args interface{}, opts ...EnqueueOptions) (str
 		return "", err
 	}
 	queue = Config.Namespace + "queue:" + queue
-	_, err = conn.Do("rpush", queue, bytes)
+	_, err = enqueueScript.Do(conn, queue, ARGV_VALUE_KEY, data.Jid, bytes)
 	if err != nil {
 		return "", err
 	}
@@ -80,13 +80,15 @@ func Enqueue(queue, class string, args interface{}, opts ...EnqueueOptions) (str
 	return data.Jid, nil
 }
 
-func enqueueAt(at float64, bytes []byte) error {
+func enqueueAt(jid string, at float64, bytes []byte) error {
 	conn := Config.Pool.Get()
 	defer conn.Close()
 
-	_, err := conn.Do(
-		"zadd",
-		Config.Namespace+SCHEDULED_JOBS_KEY, at, bytes,
+	_, err := enqueueAtScript.Do(
+		conn,
+		Config.Namespace+SCHEDULED_JOBS_KEY,
+		ARGV_VALUE_KEY,
+		jid, at, bytes,
 	)
 	if err != nil {
 		return err

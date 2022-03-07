@@ -6,6 +6,7 @@ type Action interface {
 
 type CallResult struct {
 	Acknowledge bool
+	KeepData    bool
 	Err         error
 }
 
@@ -24,13 +25,13 @@ func (m *Middlewares) Prepend(action Action) {
 	m.actions = actions
 }
 
-func (m *Middlewares) call(queue string, message *Msg, final func() error) bool {
-	return continuation(m.actions, queue, message, final)().Acknowledge
+func (m *Middlewares) call(queue string, message *Msg, final func() error) CallResult {
+	return continuation(m.actions, queue, message, final)()
 }
 
 func continuation(actions []Action, queue string, message *Msg, final func() error) func() CallResult {
 	return func() (result CallResult) {
-		result = CallResult{true, nil}
+		result = CallResult{true, false, nil}
 		if len(actions) > 0 {
 			result = actions[0].Call(
 				queue,

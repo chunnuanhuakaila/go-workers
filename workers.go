@@ -13,6 +13,7 @@ const (
 	RETRY_KEY           = "goretry"
 	SCHEDULED_JOBS_KEY  = "schedule"
 	INPROGRESS_JOBS_KEY = "inprogress"
+	ARGV_VALUE_KEY      = "argvValue"
 )
 
 var Logger = logrus.WithField("from", "go-workers")
