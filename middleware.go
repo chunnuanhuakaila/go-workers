@@ -6,7 +6,7 @@ type Action interface {
 
 type CallResult struct {
 	Acknowledge bool
-	KeepData    bool
+	KeepValue   bool
 	Err         error
 }
 

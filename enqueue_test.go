@@ -35,9 +35,10 @@ func EnqueueSpec(c gospec.Context) {
 		})
 
 		c.Specify("saves the arguments", func() {
-			jid, _ := Enqueue("enqueue3", "Compare", []string{"foo", "bar"})
+			Enqueue("enqueue3", "Compare", []string{"foo", "bar"})
 
-			bytes, _ := redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, jid))
+			bytes, _ := redis.Bytes(conn.Do("lpop", "prod:queue:enqueue3"))
+			bytes, _ = redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, string(bytes)))
 			var result map[string]interface{}
 			json.Unmarshal(bytes, &result)
 			c.Expect(result["class"], Equals, "Compare")
@@ -49,21 +50,23 @@ func EnqueueSpec(c gospec.Context) {
 		})
 
 		c.Specify("has a jid", func() {
-			jid, _ := Enqueue("enqueue4", "Compare", []string{"foo", "bar"})
+			Enqueue("enqueue4", "Compare", []string{"foo", "bar"})
 
-			bytes, _ := redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, jid))
+			bytes, _ := redis.Bytes(conn.Do("lpop", "prod:queue:enqueue4"))
+			bytes, _ = redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, string(bytes)))
 			var result map[string]interface{}
 			json.Unmarshal(bytes, &result)
 			c.Expect(result["class"], Equals, "Compare")
 
-			jid = result["jid"].(string)
+			jid := result["jid"].(string)
 			c.Expect(len(jid), Equals, 24)
 		})
 
 		c.Specify("has enqueued_at that is close to now", func() {
-			jid, _ := Enqueue("enqueue5", "Compare", []string{"foo", "bar"})
+			Enqueue("enqueue5", "Compare", []string{"foo", "bar"})
 
-			bytes, _ := redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, jid))
+			bytes, _ := redis.Bytes(conn.Do("lpop", "prod:queue:enqueue5"))
+			bytes, _ = redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, string(bytes)))
 			var result map[string]interface{}
 			json.Unmarshal(bytes, &result)
 			c.Expect(result["class"], Equals, "Compare")
@@ -74,9 +77,10 @@ func EnqueueSpec(c gospec.Context) {
 		})
 
 		c.Specify("has max_retries and retry_count when set", func() {
-			jid, _ := Enqueue("enqueue6", "Compare", []string{"foo", "bar"}, WithMaxRetries(25))
+			Enqueue("enqueue6", "Compare", []string{"foo", "bar"}, WithMaxRetries(25))
 
-			bytes, _ := redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, jid))
+			bytes, _ := redis.Bytes(conn.Do("lpop", "prod:queue:enqueue6"))
+			bytes, _ = redis.Bytes(conn.Do("hget", ARGV_VALUE_KEY, string(bytes)))
 			var result map[string]interface{}
 			json.Unmarshal(bytes, &result)
 			c.Expect(result["class"], Equals, "Compare")
@@ -104,12 +108,13 @@ func EnqueueSpec(c gospec.Context) {
 		})
 
 		c.Specify("has the correct 'queue'", func() {
-			jid, err := Enqueue("enqueuein2", "Compare", map[string]interface{}{"foo": "bar"}, WithIn(10*time.Millisecond))
+			_, err := Enqueue("enqueuein2", "Compare", map[string]interface{}{"foo": "bar"}, WithIn(10*time.Millisecond))
 			c.Expect(err, Equals, nil)
 
 			var data EnqueueData
-			elem, err := conn.Do("hget", ARGV_VALUE_KEY, jid)
-			bytes, err := redis.Bytes(elem, err)
+			elem, _ := conn.Do("zrange", scheduleQueue, 0, -1)
+			elem, err = conn.Do("hget", ARGV_VALUE_KEY, elem.([]interface{})[0])
+			bytes, _ := redis.Bytes(elem, err)
 			json.Unmarshal(bytes, &data)
 
 			c.Expect(data.Queue, Equals, "enqueuein2")

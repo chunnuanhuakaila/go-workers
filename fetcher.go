@@ -137,11 +137,7 @@ func (f *fetch) sendMessage(message string) {
 func (f *fetch) Acknowledge(ack *Acknowledge) {
 	conn := Config.Pool.Get()
 	defer conn.Close()
-	if ack.KeepData {
-		remFromZ.Do(conn, Config.Namespace+INPROGRESS_JOBS_KEY, ARGV_VALUE_KEY, ack.message.Jid(), ack.message.ToJson())
-	} else {
-		remFromZ.Do(conn, Config.Namespace+INPROGRESS_JOBS_KEY, ARGV_VALUE_KEY, ack.message.Jid())
-	}
+	remFromZ.Do(conn, Config.Namespace+INPROGRESS_JOBS_KEY, ARGV_VALUE_KEY, ack.message.Jid(), ack.KeepData)
 }
 
 func (f *fetch) Messages() chan *Msg {

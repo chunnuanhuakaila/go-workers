@@ -79,8 +79,10 @@ func FetchSpec(c gospec.Context) {
 
 			fetch.Acknowledge(&Acknowledge{message, false})
 
-			len, _ := redis.Int(conn.Do("llen", "queue:fetchQueue4:1:inprogress"))
+			len, _ := redis.Int(conn.Do("llen", Config.Namespace+INPROGRESS_JOBS_KEY))
 			c.Expect(len, Equals, 0)
+			exists, _ := redis.Bool(conn.Do("hexists", ARGV_VALUE_KEY, "jid"))
+			c.Expect(exists, Equals, false)
 
 			fetch.Close()
 		})
@@ -164,6 +166,27 @@ func FetchSpec(c gospec.Context) {
 
 			score, _ = redis.Float64(conn.Do("zscore", Config.Namespace+INPROGRESS_JOBS_KEY, message.OriginalJson()))
 			c.Expect(score, Not(Equals), float64(now))
+
+			fetch.Close()
+		})
+
+		c.Specify("removes in progress message when acknowledged and keep data", func() {
+			fetch := buildFetch("fetchQueue8")
+
+			conn := Config.Pool.Get()
+			defer conn.Close()
+
+			enqueueScript.Do(conn, "queue:fetchQueue8", ARGV_VALUE_KEY, "jid", message.ToJson())
+
+			fetch.Ready() <- true
+			<-fetch.Messages()
+
+			fetch.Acknowledge(&Acknowledge{message, true})
+
+			len, _ := redis.Int(conn.Do("llen", Config.Namespace+INPROGRESS_JOBS_KEY))
+			c.Expect(len, Equals, 0)
+			exists, _ := redis.Bool(conn.Do("hexists", ARGV_VALUE_KEY, "jid"))
+			c.Expect(exists, Equals, true)
 
 			fetch.Close()
 		})

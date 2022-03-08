@@ -16,6 +16,7 @@ const (
 type MiddlewareRetry struct{}
 
 func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResult) (result CallResult) {
+	result = CallResult{true, false, nil}
 	defer func() {
 		if e := recover(); e != nil || result.Err != nil {
 			conn := Config.Pool.Get()
@@ -23,6 +24,7 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResul
 
 			if ShouldRetry(message) {
 				message.Set("queue", queue)
+				result.KeepValue = true
 
 				if e != nil {
 					message.Set("error_message", fmt.Sprintf("%v", e))
@@ -37,9 +39,11 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResul
 					) * time.Second,
 				)
 
-				_, err := conn.Do(
-					"zadd",
+				_, err := enqueueAtScript.Do(
+					conn,
 					Config.Namespace+RETRY_KEY,
+					ARGV_VALUE_KEY,
+					message.Jid(),
 					nowToSecondsWithNanoPrecision()+waitDuration,
 					message.ToJson(),
 				)
@@ -60,7 +64,7 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResul
 			}
 
 			if e != nil {
-				panic(e)
+				result.Err = fmt.Errorf("%v", e)
 			}
 		}
 	}()

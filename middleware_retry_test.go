@@ -37,7 +37,8 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		c.Expect(retries[0], Equals, message.ToJson())
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		c.Expect(data, Equals, message.ToJson())
 	})
 
 	c.Specify("allows disabling retries", func() {
@@ -82,22 +83,26 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		c.Expect(retries[0], Equals, message.ToJson())
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		c.Expect(data, Equals, message.ToJson())
 	})
 
 	c.Specify("handles new failed message", func() {
 		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":25}")
 
+		var result CallResult
 		wares.call("myqueue", message, func() error {
-			worker.process(message)
+			result = worker.process(message)
 			return nil
 		})
+		c.Expect(result.KeepValue, Equals, true)
 
 		conn := Config.Pool.Get()
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		message, _ = NewMsg(retries[0])
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		message, _ = NewMsg(data)
 
 		queue, _ := message.Get("queue").String()
 		error_message, _ := message.Get("error_message").String()
@@ -126,7 +131,8 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		message, _ = NewMsg(retries[0])
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		message, _ = NewMsg(data)
 
 		queue, _ := message.Get("queue").String()
 		error_message, _ := message.Get("error_message").String()
@@ -153,7 +159,8 @@ func MiddlewareRetryWithPanicSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		message, _ = NewMsg(retries[0])
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		message, _ = NewMsg(data)
 
 		queue, _ := message.Get("queue").String()
 		error_message, _ := message.Get("error_message").String()
@@ -229,7 +236,8 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		c.Expect(retries[0], Equals, message.ToJson())
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		c.Expect(data, Equals, message.ToJson())
 	})
 
 	c.Specify("allows disabling retries", func() {
@@ -274,7 +282,8 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		c.Expect(retries[0], Equals, message.ToJson())
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		c.Expect(data, Equals, message.ToJson())
 	})
 
 	c.Specify("handles new failed message", func() {
@@ -289,7 +298,8 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		message, _ = NewMsg(retries[0])
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		message, _ = NewMsg(data)
 
 		queue, _ := message.Get("queue").String()
 		error_message, _ := message.Get("error_message").String()
@@ -318,7 +328,8 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		message, _ = NewMsg(retries[0])
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		message, _ = NewMsg(data)
 
 		queue, _ := message.Get("queue").String()
 		error_message, _ := message.Get("error_message").String()
@@ -345,7 +356,8 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 		defer conn.Close()
 
 		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
-		message, _ = NewMsg(retries[0])
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		message, _ = NewMsg(data)
 
 		queue, _ := message.Get("queue").String()
 		error_message, _ := message.Get("error_message").String()

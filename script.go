@@ -51,12 +51,10 @@ var scheduledScript = redis.NewScript(2, `
 // KEYS[1]: delay queue.
 // KEYS[2]: arguments hash table.
 // ARGV[1]: jid.
-// ARGV[2]: set arguments.
+// ARGV[2]: keep data.
 var remFromZ = redis.NewScript(2, `
 	local removed = redis.call('ZREM', KEYS[1], ARGV[1])
-	if ARGV[2] ~= nil then
-		redis.call('HSET', KEYS[2], ARGV[1], ARGV[2])
-	else
+	if ARGV[2] ~= '1' then
 		redis.call('HDEL', KEYS[2], ARGV[1])
 	end
 	return removed
@@ -74,4 +72,16 @@ var moveToL = redis.NewScript(3, `
 		redis.call('HSET', KEYS[3], ARGV[1], ARGV[2])
 	end
 	return removed
+`)
+
+// KEYS[1]: src delay queue.
+// KEYS[2]: dst delay queue.
+// KEYS[3]: arguments hash table.
+// ARGV[1]: jid.
+// ARGV[2]: scheduled at.
+// ARGV[3]: arguments to update.
+var moveToZ = redis.NewScript(3, `
+	redis.call('ZREM', KEYS[1], ARGV[1])
+	redis.call('ZADD', KEYS[2], ARGV[2], ARGV[1])
+	redis.call('HSET', KEYS[3], ARGV[1], ARGV[3])
 `)

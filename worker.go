@@ -32,7 +32,7 @@ func (w *worker) work(messages chan *Msg) {
 
 			result := w.process(message)
 			if result.Acknowledge {
-				w.manager.confirm <- &Acknowledge{message, result.KeepData}
+				w.manager.confirm <- &Acknowledge{message, result.KeepValue}
 			}
 			stop <- true
 

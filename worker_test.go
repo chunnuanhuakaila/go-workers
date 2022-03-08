@@ -27,7 +27,7 @@ func (l *failMiddleware) Call(queue string, message *Msg, next func() CallResult
 }
 
 func confirm(manager *manager) (msg *Msg) {
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(1 * time.Millisecond)
 
 	select {
 	case ack := <-manager.confirm:
