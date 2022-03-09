@@ -7,6 +7,7 @@ import (
 	"github.com/customerio/gospec"
 	. "github.com/customerio/gospec"
 	"github.com/garyburd/redigo/redis"
+	"github.com/google/uuid"
 )
 
 func EnqueueSpec(c gospec.Context) {
@@ -59,7 +60,7 @@ func EnqueueSpec(c gospec.Context) {
 			c.Expect(result["class"], Equals, "Compare")
 
 			jid := result["jid"].(string)
-			c.Expect(len(jid), Equals, 24)
+			c.Expect(len(jid), Equals, 36)
 		})
 
 		c.Specify("has enqueued_at that is close to now", func() {
@@ -120,6 +121,25 @@ func EnqueueSpec(c gospec.Context) {
 			c.Expect(data.Queue, Equals, "enqueuein2")
 
 			conn.Do("del", scheduleQueue)
+		})
+	})
+
+	c.Specify("JobExists", func() {
+		conn := Config.Pool.Get()
+		defer conn.Close()
+
+		c.Specify("check job exists", func() {
+			jid := uuid.New().String()
+			exists, err := JobExists(jid)
+			c.Expect(err, Equals, nil)
+			c.Expect(exists, Equals, false)
+
+			_, err = conn.Do("HSET", ARGV_VALUE_KEY, jid, "{\"foo\":\"bar\"}")
+			c.Expect(err, Equals, nil)
+
+			exists, err = JobExists(jid)
+			c.Expect(err, Equals, nil)
+			c.Expect(exists, Equals, true)
 		})
 	})
 

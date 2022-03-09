@@ -1,11 +1,11 @@
 package workers
 
 import (
-	"crypto/rand"
 	"encoding/json"
-	"fmt"
-	"io"
 	"time"
+
+	"github.com/garyburd/redigo/redis"
+	"github.com/google/uuid"
 )
 
 const (
@@ -28,13 +28,7 @@ type EnqueueParam struct {
 }
 
 func generateJid() string {
-	// Return 12 random bytes as 24 character hex
-	b := make([]byte, 12)
-	_, err := io.ReadFull(rand.Reader, b)
-	if err != nil {
-		return ""
-	}
-	return fmt.Sprintf("%x", b)
+	return uuid.New().String()
 }
 
 func Enqueue(queue, class string, args interface{}, opts ...EnqueueOptions) (string, error) {
@@ -107,4 +101,16 @@ func durationToSecondsWithNanoPrecision(d time.Duration) float64 {
 
 func nowToSecondsWithNanoPrecision() float64 {
 	return timeToSecondsWithNanoPrecision(time.Now())
+}
+
+func JobExists(jid string) (bool, error) {
+	conn := Config.Pool.Get()
+	defer conn.Close()
+
+	exists, err := redis.Bool(conn.Do("hexists", ARGV_VALUE_KEY, jid))
+	if err != nil {
+		return false, err
+	}
+
+	return exists, nil
 }
