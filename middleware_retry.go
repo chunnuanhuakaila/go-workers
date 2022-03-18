@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/rand"
 	"time"
+
+	"github.com/chein-huang/errorc"
 )
 
 const (
@@ -64,7 +66,7 @@ func (r *MiddlewareRetry) Call(queue string, message *Msg, next func() CallResul
 			}
 
 			if e != nil {
-				result.Err = fmt.Errorf("%v", e)
+				result.Err = errorc.Newf("%v", e)
 			}
 		}
 	}()
