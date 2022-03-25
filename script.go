@@ -54,7 +54,7 @@ var scheduledScript = redis.NewScript(2, `
 // ARGV[2]: keep data.
 var remFromZ = redis.NewScript(2, `
 	local removed = redis.call('ZREM', KEYS[1], ARGV[1])
-	if ARGV[2] ~= '1' then
+	if ARGV[2] ~= '1' and removed ~= 0 then
 		redis.call('HDEL', KEYS[2], ARGV[1])
 	end
 	return removed
