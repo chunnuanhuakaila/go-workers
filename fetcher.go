@@ -202,7 +202,7 @@ func (f *fetch) Heartbeat(msg *Msg) {
 		conn,
 		Config.Namespace+INPROGRESS_JOBS_KEY,
 		timeToSecondsWithNanoPrecision(time.Now().Add(f.inprogressTimeout)),
-		msg.OriginalJson(),
+		msg.Jid(),
 	)
 	if err != nil {
 		msg.Logger.Warningln("ERR: ", err)
