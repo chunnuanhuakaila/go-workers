@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -387,19 +388,85 @@ func MiddlewareRetryWithErrorSpec(c gospec.Context) {
 		c.Expect(count, Equals, 0)
 	})
 
-	c.Specify("doesn't retry after customized number of retries", func() {
-		message, _ := NewMsg("{\"jid\":\"2\",\"retry\":3,\"retry_count\":3}")
+	Config.Namespace = was
+}
 
-		wares.call("myqueue", message, func() error {
-			worker.process(message)
-			return nil
-		})
+func MiddlewareRetryWithCancelSpec(c gospec.Context) {
+	var blockJob = (func(message *Msg) error {
+		var err error
+		for err == nil {
+			err = message.Context.Err()
+		}
+		return err
+	})
+
+	var wares = NewMiddleware(
+		&MiddlewareRetry{},
+	)
+
+	manager := newManager("myqueue", blockJob, 1)
+	worker := newWorker(manager)
+
+	was := Config.Namespace
+	Config.Namespace = "prod:"
+
+	c.Specify("doesn't retry after cancel the job", func() {
+		message, _ := NewMsg("{\"jid\":\"1\",\"max_retries\":3,\"retry_count\":1}")
+		var cancel context.CancelFunc
+		message.Context, cancel = context.WithCancel(message.Context)
+		processed := make(chan bool)
+
+		go func() {
+			wares.call("myqueue", message, func() error {
+				worker.process(message)
+				return nil
+			})
+			processed <- true
+		}()
+
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			cancel()
+		}()
+		<-processed
 
 		conn := Config.Pool.Get()
 		defer conn.Close()
 
 		count, _ := redis.Int(conn.Do("zcard", "prod:"+RETRY_KEY))
 		c.Expect(count, Equals, 0)
+	})
+
+	c.Specify("doesn't retry when the job timeout", func() {
+		message, _ := NewMsg("{\"jid\":\"2\",\"max_retries\":3,\"retry_count\":1}")
+		message.Context, _ = context.WithTimeout(message.Context, 100*time.Millisecond)
+		processed := make(chan bool)
+
+		go func() {
+			wares.call("myqueue", message, func() error {
+				worker.process(message)
+				return nil
+			})
+			processed <- true
+		}()
+		<-processed
+
+		conn := Config.Pool.Get()
+		defer conn.Close()
+
+		count, _ := redis.Int(conn.Do("zcard", Config.Namespace+RETRY_KEY))
+		c.Expect(count, Equals, 1)
+
+		retries, _ := redis.Strings(conn.Do("zrange", "prod:"+RETRY_KEY, 0, 1))
+		data, _ := redis.String(conn.Do("hget", ARGV_VALUE_KEY, retries[0]))
+		message, _ = NewMsg(data)
+		queue, _ := message.Get("queue").String()
+		error_message, _ := message.Get("error_message").String()
+		retry_count, _ := message.Get("retry_count").Int()
+
+		c.Expect(queue, Equals, "myqueue")
+		c.Expect(error_message, Equals, context.DeadlineExceeded.Error())
+		c.Expect(retry_count, Equals, 2)
 	})
 
 	Config.Namespace = was

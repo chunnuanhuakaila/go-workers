@@ -39,9 +39,11 @@ func TestAllSpecs(t *testing.T) {
 	r.AddSpec(ManagerSpec)
 	r.AddSpec(ScheduledSpec)
 	r.AddSpec(EnqueueSpec)
+	r.AddSpec(CancelSpec)
 	r.AddSpec(MiddlewareSpec)
 	r.AddSpec(MiddlewareRetryWithPanicSpec)
 	r.AddSpec(MiddlewareRetryWithErrorSpec)
+	r.AddSpec(MiddlewareRetryWithCancelSpec)
 	r.AddSpec(MiddlewareStatsSpec)
 
 	// Run GoSpec and report any errors to gotest's `testing.T` instance

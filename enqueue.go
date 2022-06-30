@@ -2,6 +2,7 @@ package workers
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -113,4 +114,16 @@ func JobExists(jid string) (bool, error) {
 	}
 
 	return exists, nil
+}
+
+func CancelJob(jid string) error {
+	conn := Config.Pool.Get()
+	defer conn.Close()
+
+	_, err := conn.Do("SET", fmt.Sprintf("%s-%s", Config.Namespace+CANCEL_KEY, jid), true, "EX", inprogressTimeout)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

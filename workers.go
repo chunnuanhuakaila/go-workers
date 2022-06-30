@@ -14,6 +14,7 @@ const (
 	SCHEDULED_JOBS_KEY  = "schedule"
 	INPROGRESS_JOBS_KEY = "inprogress"
 	ARGV_VALUE_KEY      = "argvValue"
+	CANCEL_KEY          = "cancel"
 )
 
 var Logger = logrus.WithField("from", "go-workers")

@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -86,7 +87,7 @@ func ShouldRetry(message *Msg) bool {
 
 	count, _ := message.Get(retryCountKey).Int()
 
-	return retry && count < max
+	return message.Context.Err() != context.Canceled && retry && count < max
 }
 
 func incrementRetry(message *Msg) (retryCount int) {

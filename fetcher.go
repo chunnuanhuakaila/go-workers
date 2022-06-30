@@ -1,10 +1,16 @@
 package workers
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+)
+
+const (
+	checkInterval     = 10
+	inprogressTimeout = 60
 )
 
 type Fetcher interface {
@@ -18,6 +24,7 @@ type Fetcher interface {
 	Closed() bool
 	HeartbeatJob(*Msg) chan bool
 	Heartbeat(*Msg)
+	Continue(*Msg) bool
 }
 
 type fetch struct {
@@ -41,8 +48,8 @@ func NewFetch(queue string, messages chan *Msg, ready chan bool) Fetcher {
 		make(chan bool),
 		make(chan bool),
 		make(chan bool),
-		60 * time.Second,
-		50 * time.Second,
+		inprogressTimeout * time.Second,
+		checkInterval * time.Second,
 	}
 }
 
@@ -171,6 +178,9 @@ func (f *fetch) inprogressQueue() string {
 }
 
 func (f *fetch) HeartbeatJob(msg *Msg) chan bool {
+	var cancel context.CancelFunc
+	msg.Context, cancel = context.WithCancel(msg.Context)
+
 	stop := make(chan bool)
 	ticker := time.NewTicker(f.heartbeatInterval)
 	go func() {
@@ -185,6 +195,24 @@ func (f *fetch) HeartbeatJob(msg *Msg) chan bool {
 			}
 		}
 	}()
+
+	continueTicker := time.NewTicker(f.heartbeatInterval)
+	go func() {
+		defer ticker.Stop()
+	checkLoop:
+		for {
+			select {
+			case <-continueTicker.C:
+				if !f.Continue(msg) {
+					cancel()
+					break checkLoop
+				}
+			case <-stop:
+				break checkLoop
+			}
+		}
+	}()
+
 	return stop
 }
 
@@ -211,4 +239,16 @@ func (f *fetch) Heartbeat(msg *Msg) {
 
 func (f *fetch) HeartbeatInterval() time.Duration {
 	return f.heartbeatInterval
+}
+
+func (f *fetch) Continue(msg *Msg) bool {
+	conn := Config.Pool.Get()
+	defer conn.Close()
+
+	exists, err := redis.Bool(conn.Do("EXISTS", fmt.Sprintf("%s-%s", Config.Namespace+CANCEL_KEY, msg.Jid())))
+	if err != nil {
+		msg.Logger.Warningln("ERR: ", err)
+		return true
+	}
+	return !exists
 }

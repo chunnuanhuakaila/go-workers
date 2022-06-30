@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/customerio/gospec"
@@ -156,15 +157,15 @@ func FetchSpec(c gospec.Context) {
 				"zadd",
 				Config.Namespace+INPROGRESS_JOBS_KEY,
 				now,
-				message.OriginalJson(),
+				message.Jid(),
 			)
 
-			score, _ := redis.Float64(conn.Do("zscore", Config.Namespace+INPROGRESS_JOBS_KEY, message.OriginalJson()))
+			score, _ := redis.Float64(conn.Do("zscore", Config.Namespace+INPROGRESS_JOBS_KEY, message.Jid()))
 			c.Expect(score, Equals, float64(now))
 
 			fetch.Heartbeat(message)
 
-			score, _ = redis.Float64(conn.Do("zscore", Config.Namespace+INPROGRESS_JOBS_KEY, message.OriginalJson()))
+			score, _ = redis.Float64(conn.Do("zscore", Config.Namespace+INPROGRESS_JOBS_KEY, message.Jid()))
 			c.Expect(score, Not(Equals), float64(now))
 
 			fetch.Close()
@@ -187,6 +188,24 @@ func FetchSpec(c gospec.Context) {
 			c.Expect(len, Equals, 0)
 			exists, _ := redis.Bool(conn.Do("hexists", ARGV_VALUE_KEY, "jid"))
 			c.Expect(exists, Equals, true)
+
+			fetch.Close()
+		})
+
+		c.Specify("check if job should continue", func() {
+			fetch := buildFetch("fetchQueue8")
+
+			shouldContinue := fetch.Continue(message)
+			c.Expect(shouldContinue, IsTrue)
+
+			conn := Config.Pool.Get()
+			defer conn.Close()
+
+			_, err := conn.Do("SET", fmt.Sprintf("%s-%s", Config.Namespace+CANCEL_KEY, message.Jid()), true, "EX", inprogressTimeout)
+			c.Expect(err, IsNil)
+
+			shouldContinue = fetch.Continue(message)
+			c.Expect(shouldContinue, IsFalse)
 
 			fetch.Close()
 		})

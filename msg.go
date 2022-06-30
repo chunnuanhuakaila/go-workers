@@ -1,6 +1,7 @@
 package workers
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 
@@ -16,7 +17,7 @@ type Msg struct {
 	*data
 	original string
 	Logger   *logrus.Entry
-	Context  map[string]interface{}
+	Context  context.Context
 }
 
 type Args struct {
@@ -59,7 +60,7 @@ func NewMsg(content string) (*Msg, error) {
 	if d, err := newData(content); err != nil {
 		return nil, err
 	} else {
-		m := &Msg{data: d, original: content, Logger: nil, Context: map[string]interface{}{}}
+		m := &Msg{data: d, original: content, Logger: nil, Context: context.TODO()}
 		m.Logger = Logger.WithField("Jid", m.Jid())
 		return m, nil
 	}
