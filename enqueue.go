@@ -2,6 +2,7 @@ package workers
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -10,6 +11,10 @@ import (
 
 const (
 	NanoSecondPrecision = 1000000000.0
+)
+
+var (
+	ErrJidExists = fmt.Errorf("jid has already exists")
 )
 
 type EnqueueData struct {
@@ -25,6 +30,7 @@ type EnqueueParam struct {
 	RetryCount int     `json:"retry_count,omitempty"`
 	At         float64 `json:"at,omitempty"`
 	MaxRetries int     `json:"max_retries,omitempty"`
+	Jid        string  `json:"jid,omitempty"`
 }
 
 func generateJid() string {
@@ -43,7 +49,7 @@ func Enqueue(queue, class string, args interface{}, opts ...EnqueueOptions) (str
 		Queue:        queue,
 		Class:        class,
 		Args:         args,
-		Jid:          generateJid(),
+		Jid:          param.Jid,
 		EnqueuedAt:   now,
 		EnqueueParam: param,
 	}
@@ -66,9 +72,14 @@ func Enqueue(queue, class string, args interface{}, opts ...EnqueueOptions) (str
 		return "", err
 	}
 	queue = Config.Namespace + "queue:" + queue
-	_, err = enqueueScript.Do(conn, queue, ARGV_VALUE_KEY, data.Jid, bytes)
+	var ok bool
+	ok, err = redis.Bool(enqueueScript.Do(conn, queue, ARGV_VALUE_KEY, data.Jid, bytes))
 	if err != nil {
 		return "", err
+	}
+
+	if !ok {
+		return "", ErrJidExists
 	}
 
 	return data.Jid, nil
@@ -78,14 +89,18 @@ func enqueueAt(jid string, at float64, bytes []byte) error {
 	conn := Config.Pool.Get()
 	defer conn.Close()
 
-	_, err := enqueueAtScript.Do(
+	ok, err := redis.Bool(enqueueAtScript.Do(
 		conn,
 		Config.Namespace+SCHEDULED_JOBS_KEY,
 		ARGV_VALUE_KEY,
 		jid, at, bytes,
-	)
+	))
 	if err != nil {
 		return err
+	}
+
+	if !ok {
+		return ErrJidExists
 	}
 
 	return nil
@@ -113,4 +128,16 @@ func JobExists(jid string) (bool, error) {
 	}
 
 	return exists, nil
+}
+
+func CancelJob(jid string) error {
+	conn := Config.Pool.Get()
+	defer conn.Close()
+
+	_, err := conn.Do("SET", fmt.Sprintf("%s-%s", Config.Namespace+CANCEL_KEY, jid), true, "EX", inprogressTimeout)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

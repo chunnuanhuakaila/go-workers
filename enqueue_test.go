@@ -141,6 +141,42 @@ func EnqueueSpec(c gospec.Context) {
 			c.Expect(err, Equals, nil)
 			c.Expect(exists, Equals, true)
 		})
+
+		c.Specify("enqueue with same jid", func() {
+			jid, err := Enqueue("queue4", "ADD", "1", WithJid("jid"))
+			c.Expect(jid, Equals, "jid")
+			c.Expect(err, IsNil)
+
+			_, err = Enqueue("queue4", "ADD", "1", WithJid("jid"))
+			c.Expect(err, Equals, ErrJidExists)
+		})
+
+		c.Specify("enqueueIn with same jid", func() {
+			jid, err := Enqueue("queue5", "ADD", "1", WithIn(1*time.Second), WithJid("jid"))
+			c.Expect(jid, Equals, "jid")
+			c.Expect(err, IsNil)
+
+			_, err = Enqueue("queue5", "ADD", "1", WithJid("jid"))
+			c.Expect(err, Equals, ErrJidExists)
+		})
+
+		c.Specify("enqueueIn with same jid", func() {
+			jid, err := Enqueue("queue6", "ADD", "1", WithJid("jid"))
+			c.Expect(jid, Equals, "jid")
+			c.Expect(err, IsNil)
+
+			_, err = Enqueue("queue6", "ADD", "1", WithIn(1*time.Second), WithJid("jid"))
+			c.Expect(err, Equals, ErrJidExists)
+		})
+
+		c.Specify("enqueueIn with same jid", func() {
+			jid, err := Enqueue("queue7", "ADD", "1", WithIn(1*time.Second), WithJid("jid"))
+			c.Expect(jid, Equals, "jid")
+			c.Expect(err, IsNil)
+
+			_, err = Enqueue("queue7", "ADD", "1", WithIn(1*time.Second), WithJid("jid"))
+			c.Expect(err, Equals, ErrJidExists)
+		})
 	})
 
 	Config.Namespace = was

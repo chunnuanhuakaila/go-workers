@@ -2,6 +2,7 @@ package workers
 
 import (
 	"reflect"
+	"time"
 
 	"github.com/customerio/gospec"
 	. "github.com/customerio/gospec"
@@ -12,6 +13,18 @@ var called chan bool
 func myJob(message *Msg) error {
 	called <- true
 	return nil
+}
+
+var quitted chan bool
+
+func blckJob(message *Msg) error {
+	var err error
+	for err == nil {
+		time.Sleep(100 * time.Millisecond)
+		err = message.Context.Err()
+	}
+	quitted <- true
+	return err
 }
 
 func WorkersSpec(c gospec.Context) {
@@ -92,6 +105,26 @@ func WorkersSpec(c gospec.Context) {
 
 			// Clear out global hooks variable
 			duringDrain = nil
+		})
+
+		c.Specify("runs beforeStart hooks", func() {
+			quitted = make(chan bool)
+
+			Process("myqueue", blckJob, 10)
+
+			Start()
+
+			jid, err := Enqueue("myqueue", "Add", []int{1, 2})
+			c.Expect(err, IsNil)
+
+			time.Sleep(100 * time.Millisecond)
+			c.Expect(len(quitted), Equals, 0)
+
+			err = CancelJob(jid)
+			c.Expect(err, IsNil)
+			<-quitted
+
+			Quit()
 		})
 	})
 }

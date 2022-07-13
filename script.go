@@ -22,8 +22,14 @@ var popMessageScript = redis.NewScript(3, `
 // ARGV[2]: scheduled at.
 // ARGV[3]: job arguments.
 var enqueueAtScript = redis.NewScript(2, `
-	redis.call('ZADD', KEYS[1], ARGV[2], ARGV[1])
-	redis.call('HSET', KEYS[2], ARGV[1], ARGV[3])
+	local exists = redis.call('HEXISTS', KEYS[2], ARGV[1])
+	if exists == 0 then
+		redis.call('ZADD', KEYS[1], ARGV[2], ARGV[1])
+		redis.call('HSET', KEYS[2], ARGV[1], ARGV[3])
+		return 1
+	else
+		return 0
+	end
 `)
 
 // KEYS[1]: queue.
@@ -31,8 +37,14 @@ var enqueueAtScript = redis.NewScript(2, `
 // ARGV[1]: jid.
 // ARGV[2]: job arguments.
 var enqueueScript = redis.NewScript(2, `
-	redis.call('LPUSH', KEYS[1], ARGV[1])
-	redis.call('HSET', KEYS[2], ARGV[1], ARGV[2])
+	local exists = redis.call('HEXISTS', KEYS[2], ARGV[1])
+	if exists == 0 then
+		redis.call('LPUSH', KEYS[1], ARGV[1])
+		redis.call('HSET', KEYS[2], ARGV[1], ARGV[2])
+		return 1
+	else
+		return 0
+	end
 `)
 
 // KEYS[1]: delay queue.
