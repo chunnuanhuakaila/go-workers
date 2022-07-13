@@ -40,8 +40,15 @@ func WithMaxRetries(maxRetries int) EnqueueOptFunc {
 	})
 }
 
+func WithJid(jid string) EnqueueOptFunc {
+	return (EnqueueOptFunc)(func(param *EnqueueParam) {
+		param.Jid = jid
+	})
+}
+
 func defaultEnqueueOpt(param *EnqueueParam) {
 	param.At = nowToSecondsWithNanoPrecision()
 	param.MaxRetries = 0
 	param.RetryCount = 0
+	param.Jid = generateJid()
 }
