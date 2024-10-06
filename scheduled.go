@@ -46,7 +46,10 @@ func (s *scheduled) poll() {
 				break
 			}
 
-			message, _ := NewMsg(messages[1])
+			message, err := NewMsg(messages[1])
+			if err != nil { 
+				continue
+			}
 			queue, _ := message.Get("queue").String()
 			queue = strings.TrimPrefix(queue, Config.Namespace)
 			message.Set("enqueued_at", nowToSecondsWithNanoPrecision())
